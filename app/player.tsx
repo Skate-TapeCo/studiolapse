@@ -1,9 +1,8 @@
 // @ts-nocheck
 import { Video } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as ScreenOrientation from 'expo-screen-orientation';
-import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Player() {
   const { uri, title } = useLocalSearchParams();
@@ -11,61 +10,44 @@ export default function Player() {
   const ref = useRef<Video | null>(null);
   const [status, setStatus] = useState<any>({});
 
-  useEffect(() => {
-    ScreenOrientation.unlockAsync();
-    return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    };
-  }, []);
-
   if (!uri) {
     return (
-      <View style={s.container}>
-        <Text style={s.title}>No video</Text>
+      <View style={s.center}>
+        <Text style={s.noVid}>No video</Text>
         <TouchableOpacity onPress={() => router.back()} style={s.smallBtn}>
-          <Text style={s.smallBtnText}>Back</Text>
+          <Text style={s.smallBtnTxt}>Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  const { width, height } = Dimensions.get('window');
+
   return (
-    <View style={s.container}>
-      <Text style={s.title}>{title || 'Clip'}</Text>
-      <View style={s.player}>
-        <Video
-          ref={ref}
-          style={s.video}
-          source={{ uri: String(uri) }}
-          useNativeControls
-          resizeMode="contain"
-          shouldPlay
-          onPlaybackStatusUpdate={setStatus}
-        />
-      </View>
+    <View style={s.full}>
+      <Video
+        ref={ref}
+        style={{ width, height }}
+        source={{ uri: String(uri) }}
+        useNativeControls
+        resizeMode="contain"
+        shouldPlay
+        onPlaybackStatusUpdate={setStatus}
+      />
       <View style={s.controls}>
-        <TouchableOpacity onPress={() => ref.current?.playAsync()} style={s.smallBtn}>
-          <Text style={s.smallBtnText}>Play</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => ref.current?.pauseAsync()} style={s.smallBtn}>
-          <Text style={s.smallBtnText}>Pause</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.back()} style={s.smallBtn}>
-          <Text style={s.smallBtnText}>Done</Text>
-        </TouchableOpacity>
+        <TouchableOpacity onPress={() => ref.current?.playAsync()} style={s.smallBtn}><Text style={s.smallBtnTxt}>Play</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => ref.current?.pauseAsync()} style={s.smallBtn}><Text style={s.smallBtnTxt}>Pause</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={s.smallBtn}><Text style={s.smallBtnTxt}>Done</Text></TouchableOpacity>
       </View>
-      <Text style={s.meta}>{status?.positionMillis ? Math.round(status.positionMillis / 1000) : 0}s</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000', padding: 16 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12 },
-  player: { flex: 1, backgroundColor: '#000', borderRadius: 12, overflow: 'hidden' },
-  video: { width: '100%', height: '100%' },
-  controls: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  full: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  controls: { position: 'absolute', bottom: 12, left: 12, right: 12, flexDirection: 'row', gap: 12, justifyContent: 'center' },
   smallBtn: { backgroundColor: '#222', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8 },
-  smallBtnText: { color: '#fff', fontWeight: '600' },
-  meta: { color: '#aaa', marginTop: 8 },
+  smallBtnTxt: { color: '#fff', fontWeight: '600' },
+  center: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  noVid: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12 },
 });
