@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useProject } from '../../src/context/ProjectContext';
 
 const PROJECTS_KEY = 'studiolapse:projects';
@@ -41,9 +41,14 @@ export default function ProjectDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { setSelectedProjectId } = useProject();
+
   const [project, setProject] = useState<any | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState('');
+
+  // NEW: export picker state
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [targetDurationSec, setTargetDurationSec] = useState<number | null>(null);
 
   const loadProject = useCallback(async () => {
     const raw = await AsyncStorage.getItem(PROJECTS_KEY);
@@ -89,9 +94,18 @@ export default function ProjectDetail() {
         <Text style={s.recordText}>Record for this Project</Text>
       </Pressable>
 
-     <Pressable disabled style={[s.exportBtn, { opacity: 0.5 }]}>
-        <Text style={s.exportText}>Export Timelapse (coming soon)</Text>
-     </Pressable>
+      {/* Export button now opens duration picker */}
+      <View style={s.exportRow}>
+        <Pressable
+          onPress={() => setExportModalVisible(true)}
+          style={s.exportBtn}
+        >
+          <Text style={s.exportText}>Export Timelapse</Text>
+        </Pressable>
+        <Text style={s.chosenText}>
+          {targetDurationSec ? `Chosen: ${targetDurationSec}s` : 'No duration chosen'}
+        </Text>
+      </View>
 
       {!renaming ? (
         <View style={s.actionsRow}>
@@ -180,6 +194,49 @@ export default function ProjectDetail() {
         )}
         ListEmptyComponent={<Text style={s.muted}>No clips yet for this project.</Text>}
       />
+
+      {/* Duration picker modal */}
+      <Modal
+        visible={exportModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExportModalVisible(false)}
+      >
+        <View style={s.backdrop}>
+          <View style={s.card}>
+            <Text style={s.modalTitle}>Choose final timelapse length</Text>
+            <View style={s.optionsRow}>
+              {[20, 30, 45, 60].map((sec) => (
+                <Pressable
+                  key={sec}
+                  onPress={() => setTargetDurationSec(sec)}
+                  style={[
+                    s.optionBtn,
+                    targetDurationSec === sec && s.optionBtnActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.optionText,
+                      targetDurationSec === sec && s.optionTextActive,
+                    ]}
+                  >
+                    {sec}s
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable style={[s.optionBtn, s.optionBtnDisabled]} disabled>
+              <Text style={[s.optionText, s.optionTextDisabled]}>Custom (Pro later)</Text>
+            </Pressable>
+            <View style={s.modalActions}>
+              <Pressable onPress={() => setExportModalVisible(false)} style={s.cancelBtn2}>
+                <Text style={s.cancelText2}>Done</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -188,19 +245,28 @@ const s = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   title: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
   muted: { color: '#666' },
+
+  recordBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 12, alignSelf: 'flex-start' },
+  recordText: { color: '#fff', fontWeight: '700' },
+
+  exportRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  exportBtn: { backgroundColor: '#111', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignSelf: 'flex-start' },
+  exportText: { color: '#fff', fontWeight: '700' },
+  chosenText: { color: '#555' },
+
   actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   renameBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
   renameText: { color: '#fff', fontWeight: '700' },
   deleteProjectBtn: { backgroundColor: '#b02727', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
   deleteProjectText: { color: '#fff', fontWeight: '700' },
+
   renameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 10, height: 40 },
   saveBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
   saveText: { color: '#fff', fontWeight: '700' },
   cancelBtn: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
   cancelText: { color: '#333', fontWeight: '700' },
-  recordBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 16, alignSelf: 'flex-start' },
-  recordText: { color: '#fff', fontWeight: '700' },
+
   clipRow: { paddingVertical: 12, borderBottomWidth: 1, borderColor: '#eee', flexDirection: 'row', alignItems: 'center' },
   clipTitle: { fontSize: 16, fontWeight: '600' },
   clipMeta: { color: '#666', marginBottom: 4 },
@@ -209,13 +275,18 @@ const s = StyleSheet.create({
   shareText: { color: '#fff', fontWeight: '600' },
   deleteBtn: { backgroundColor: '#d9534f', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, marginLeft: 10 },
   deleteText: { color: '#fff', fontWeight: '600' },
-  exportBtn: {
-  backgroundColor: '#111',
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 8,
-  marginBottom: 16,
-  alignSelf: 'flex-start'
-},
-exportText: { color: '#fff', fontWeight: '700' },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  card: { backgroundColor: '#fff', width: '100%', borderRadius: 14, padding: 16, gap: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#111' },
+  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  optionBtn: { borderWidth: 1, borderColor: '#ccc', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
+  optionBtnActive: { borderColor: '#111', backgroundColor: '#111' },
+  optionText: { color: '#111', fontWeight: '700' },
+  optionTextActive: { color: '#fff' },
+  optionBtnDisabled: { opacity: 0.4, borderStyle: 'dashed' },
+  optionTextDisabled: { color: '#666' },
+  modalActions: { marginTop: 4, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  cancelBtn2: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
+  cancelText2: { color: '#333', fontWeight: '700' },
 });

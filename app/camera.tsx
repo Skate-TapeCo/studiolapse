@@ -3,8 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { ComponentRef, useEffect, useRef, useState } from 'react';
 import { Alert, Button, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProject } from '../src/context/ProjectContext';
 
 type CamInst = ComponentRef<typeof CameraView>;
@@ -38,6 +40,16 @@ export default function CameraScreen() {
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [blink, setBlink] = useState(true);
 
+  const insets = useSafeAreaInsets();
+
+  // Keep camera screen portrait; allow rotation elsewhere after we leave
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    return () => {
+      ScreenOrientation.unlockAsync();
+    };
+  }, []);
+
   useEffect(() => {
     (async () => {
       const lib = await MediaLibrary.requestPermissionsAsync();
@@ -60,12 +72,16 @@ export default function CameraScreen() {
     return () => clearInterval(t);
   }, [recording]);
 
-  if (!camPerm || !micPerm) return <View style={styles.center}><Text>Checking permissions…</Text></View>;
+  if (!camPerm || !micPerm) {
+    return <View style={s.center}><Text>Checking permissions…</Text></View>;
+  }
 
   if (!camPerm.granted || !micPerm.granted) {
     return (
-      <View style={styles.center}>
-        <Text style={{ marginBottom: 10, textAlign: 'center' }}>StudioLapse needs Camera and Microphone permissions.</Text>
+      <View style={s.center}>
+        <Text style={{ marginBottom: 10, textAlign: 'center' }}>
+          StudioLapse needs Camera and Microphone permissions.
+        </Text>
         {!camPerm.granted && <Button title="Grant Camera" onPress={requestCamPerm} />}
         {!micPerm.granted && <View style={{ height: 8 }} />}
         {!micPerm.granted && <Button title="Grant Microphone" onPress={requestMicPerm} />}
@@ -94,7 +110,7 @@ export default function CameraScreen() {
       Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
     }
     setRecording(false);
-    router.back();
+    router.back(); // player screen can now rotate because we unlock on unmount
   };
 
   const startRecording = async () => {
@@ -134,48 +150,55 @@ export default function CameraScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'black' }}>
-      <CameraView
-        ref={camRef}
-        style={{ flex: 1 }}
-        facing="back"
-        mode="video"
-        videoQuality="720p"
-        onCameraReady={onReady}
-      />
+    <SafeAreaView style={s.full} edges={['top','bottom','left','right']}>
+      <View style={s.previewWrap}>
+        <CameraView
+          ref={camRef}
+          style={s.preview}
+          facing="back"
+          mode="video"
+          videoQuality="720p"
+          ratio="16:9"
+          onCameraReady={onReady}
+        />
+      </View>
 
       {recording && (
-        <View style={styles.indicatorWrapper}>
-          <View style={[styles.dot, { opacity: blink ? 1 : 0.2 }]} />
-          <Text style={styles.timerText}>
-            {String(Math.floor(recordSeconds / 60)).padStart(2, '0')}:{String(recordSeconds % 60).padStart(2, '0')}
+        <View style={[s.indicator, { top: insets.top + 12, left: 16 }]}>
+          <View style={[s.dot, { opacity: blink ? 1 : 0.25 }]} />
+          <Text style={s.timer}>
+            {String(Math.floor(recordSeconds / 60)).padStart(2, '0')}:
+            {String(recordSeconds % 60).padStart(2, '0')}
           </Text>
         </View>
       )}
 
-      <View style={styles.controls}>
+      <View style={[s.controls, { marginBottom: insets.bottom + 20 }]}>
         {!recording ? (
           <TouchableOpacity
             onPress={startRecording}
-            style={[styles.btn, { backgroundColor: ready ? 'red' : '#444' }]}
+            style={[s.btn, { backgroundColor: ready ? 'red' : '#444' }]}
             disabled={!ready}
           />
         ) : (
-          <TouchableOpacity onPress={stopRecording} style={[styles.btn, { backgroundColor: 'white' }]} />
+          <TouchableOpacity onPress={stopRecording} style={[s.btn, { backgroundColor: 'white' }]} />
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
+  full: { flex: 1, backgroundColor: '#000' },
+  previewWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
+  preview: { width: '100%', height: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  controls: { position: 'absolute', bottom: 40, width: '100%', alignItems: 'center' },
+  controls: { position: 'absolute', bottom: 0, width: '100%', alignItems: 'center' },
   btn: { width: 72, height: 72, borderRadius: 36 },
-  indicatorWrapper: {
-    position: 'absolute', top: 40, left: 20, flexDirection: 'row', alignItems: 'center',
+  indicator: {
+    position: 'absolute', flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8
   },
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: 'red', marginRight: 8 },
-  timerText: { color: 'white', fontSize: 16, fontWeight: '600' },
+  timer: { color: 'white', fontSize: 16, fontWeight: '600' },
 });
