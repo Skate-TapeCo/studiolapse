@@ -46,7 +46,6 @@ export default function ProjectDetail() {
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState('');
 
-  // NEW: export picker state
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [targetDurationSec, setTargetDurationSec] = useState<number | null>(null);
 
@@ -55,7 +54,7 @@ export default function ProjectDetail() {
     const list = raw ? JSON.parse(raw) : [];
     const found = list.find((p: any) => p.id === String(id)) || null;
     if (found && Array.isArray(found.clips)) {
-      found.clips = [...found.clips].sort((a, b) => b.createdAt - a.createdAt); // newest on top
+      found.clips = [...found.clips].sort((a, b) => b.createdAt - a.createdAt);
     }
     setProject(found);
     setEditName(found?.name || '');
@@ -68,6 +67,31 @@ export default function ProjectDetail() {
       loadProject();
     }, [loadProject])
   );
+
+  const beginExport = async () => {
+    if (!project) return;
+    if (!targetDurationSec) {
+      Alert.alert('Choose duration', 'Please pick a final timelapse length first.');
+      return;
+    }
+    const clips = Array.isArray(project.clips) ? project.clips : [];
+    if (clips.length === 0) {
+      Alert.alert('No clips', 'This project has no clips to export.');
+      return;
+    }
+    const sorted = [...clips].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const payload = {
+      projectId: project.id,
+      projectName: project.name,
+      targetDurationSec,
+      clipUris: sorted.map((c) => String(c.uri)),
+      createdAt: Date.now(),
+    };
+    await AsyncStorage.setItem('studiolapse:pendingExport', JSON.stringify(payload));
+router.push('/export');
+  };
 
   if (!project) {
     return (
@@ -94,18 +118,25 @@ export default function ProjectDetail() {
         <Text style={s.recordText}>Record for this Project</Text>
       </Pressable>
 
-      {/* Export button now opens duration picker */}
       <View style={s.exportRow}>
-        <Pressable
-          onPress={() => setExportModalVisible(true)}
-          style={s.exportBtn}
-        >
+        <Pressable onPress={() => setExportModalVisible(true)} style={s.exportBtn}>
           <Text style={s.exportText}>Export Timelapse</Text>
         </Pressable>
         <Text style={s.chosenText}>
           {targetDurationSec ? `Chosen: ${targetDurationSec}s` : 'No duration chosen'}
         </Text>
       </View>
+
+      <Pressable
+        onPress={beginExport}
+        disabled={!targetDurationSec || !Array.isArray(project.clips) || project.clips.length === 0}
+        style={[
+          s.combineBtn,
+          (!targetDurationSec || !Array.isArray(project.clips) || project.clips.length === 0) && { opacity: 0.5 }
+        ]}
+      >
+        <Text style={s.combineText}>Combine Now</Text>
+      </Pressable>
 
       {!renaming ? (
         <View style={s.actionsRow}>
@@ -159,7 +190,12 @@ export default function ProjectDetail() {
           <View style={s.clipRow}>
             <Pressable
               style={{ flex: 1 }}
-              onPress={() => router.push({ pathname: '/player', params: { uri: item.uri, title: `Clip ${total - index}` } })}
+              onPress={() =>
+                router.push({
+                  pathname: '/player',
+                  params: { uri: item.uri, title: `Clip ${total - index}` },
+                })
+              }
             >
               <Text style={s.clipTitle}>Clip {total - index}</Text>
               <Text style={s.clipMeta}>{new Date(item.createdAt).toLocaleString()}</Text>
@@ -172,7 +208,7 @@ export default function ProjectDetail() {
                   await Share.share({
                     title: `Clip ${total - index}`,
                     message: item.uri,
-                    url: item.uri
+                    url: item.uri,
                   });
                 } catch {}
               }}
@@ -195,7 +231,6 @@ export default function ProjectDetail() {
         ListEmptyComponent={<Text style={s.muted}>No clips yet for this project.</Text>}
       />
 
-      {/* Duration picker modal */}
       <Modal
         visible={exportModalVisible}
         transparent
@@ -249,10 +284,13 @@ const s = StyleSheet.create({
   recordBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 12, alignSelf: 'flex-start' },
   recordText: { color: '#fff', fontWeight: '700' },
 
-  exportRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  exportRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   exportBtn: { backgroundColor: '#111', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignSelf: 'flex-start' },
   exportText: { color: '#fff', fontWeight: '700' },
   chosenText: { color: '#555' },
+
+  combineBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 16, alignSelf: 'flex-start' },
+  combineText: { color: '#fff', fontWeight: '700' },
 
   actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   renameBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
