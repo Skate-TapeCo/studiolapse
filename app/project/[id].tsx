@@ -6,7 +6,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useProject } from '../../src/context/ProjectContext';
 
+export const options = { title: '' };
+
 const PROJECTS_KEY = 'studiolapse:projects';
+const BRAND_ORANGE = '#FF3A1E';
+const BRAND_CHARCOAL = '#2A2F33';
+const BRAND_RED = '#b02727';
 
 async function deleteClip(projectId: string, clipIndex: number) {
   const raw = await AsyncStorage.getItem(PROJECTS_KEY);
@@ -45,7 +50,6 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<any | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState('');
-
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [targetDurationSec, setTargetDurationSec] = useState<number | null>(null);
 
@@ -62,11 +66,7 @@ export default function ProjectDetail() {
 
   useEffect(() => { loadProject(); }, [loadProject]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProject();
-    }, [loadProject])
-  );
+  useFocusEffect(useCallback(() => { loadProject(); }, [loadProject]));
 
   const beginExport = async () => {
     if (!project) return;
@@ -90,7 +90,7 @@ export default function ProjectDetail() {
       createdAt: Date.now(),
     };
     await AsyncStorage.setItem('studiolapse:pendingExport', JSON.stringify(payload));
-router.push('/export');
+    router.push('/export');
   };
 
   if (!project) {
@@ -119,8 +119,8 @@ router.push('/export');
       </Pressable>
 
       <View style={s.exportRow}>
-        <Pressable onPress={() => setExportModalVisible(true)} style={s.exportBtn}>
-          <Text style={s.exportText}>Export Timelapse</Text>
+        <Pressable onPress={() => setExportModalVisible(true)} style={s.durationBtn}>
+          <Text style={s.durationText}>Duration</Text>
         </Pressable>
         <Text style={s.chosenText}>
           {targetDurationSec ? `Chosen: ${targetDurationSec}s` : 'No duration chosen'}
@@ -277,54 +277,52 @@ router.push('/export');
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
+  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 12, color: BRAND_CHARCOAL },
   muted: { color: '#666' },
 
-  recordBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 12, alignSelf: 'flex-start' },
-  recordText: { color: '#fff', fontWeight: '700' },
+  recordBtn: { backgroundColor: BRAND_ORANGE, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginBottom: 12, alignSelf: 'flex-start' },
+  recordText: { color: '#fff', fontWeight: '800' },
 
   exportRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  exportBtn: { backgroundColor: '#111', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignSelf: 'flex-start' },
-  exportText: { color: '#fff', fontWeight: '700' },
+  durationBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start' },
+  durationText: { color: '#fff', fontWeight: '800' },
   chosenText: { color: '#555' },
 
-  combineBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginBottom: 16, alignSelf: 'flex-start' },
-  combineText: { color: '#fff', fontWeight: '700' },
+  combineBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginBottom: 16, alignSelf: 'flex-start' },
+  combineText: { color: '#fff', fontWeight: '800' },
 
   actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  renameBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
-  renameText: { color: '#fff', fontWeight: '700' },
-  deleteProjectBtn: { backgroundColor: '#b02727', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
-  deleteProjectText: { color: '#fff', fontWeight: '700' },
+  renameBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  renameText: { color: '#fff', fontWeight: '800' },
+  deleteProjectBtn: { backgroundColor: BRAND_RED, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  deleteProjectText: { color: '#fff', fontWeight: '800' },
 
   renameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingHorizontal: 10, height: 40 },
-  saveBtn: { backgroundColor: '#1f6feb', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
-  saveText: { color: '#fff', fontWeight: '700' },
-  cancelBtn: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
-  cancelText: { color: '#333', fontWeight: '700' },
+  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 10, paddingHorizontal: 10, height: 40 },
+  saveBtn: { backgroundColor: BRAND_ORANGE, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  saveText: { color: '#fff', fontWeight: '800' },
+  cancelBtn: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  cancelText: { color: '#333', fontWeight: '800' },
 
   clipRow: { paddingVertical: 12, borderBottomWidth: 1, borderColor: '#eee', flexDirection: 'row', alignItems: 'center' },
-  clipTitle: { fontSize: 16, fontWeight: '600' },
+  clipTitle: { fontSize: 16, fontWeight: '600', color: BRAND_CHARCOAL },
   clipMeta: { color: '#666', marginBottom: 4 },
   uri: { fontSize: 12, color: '#444' },
-  shareBtn: { backgroundColor: '#444', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, marginLeft: 10 },
-  shareText: { color: '#fff', fontWeight: '600' },
-  deleteBtn: { backgroundColor: '#d9534f', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, marginLeft: 10 },
-  deleteText: { color: '#fff', fontWeight: '600' },
+  shareBtn: { backgroundColor: '#444', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginLeft: 10 },
+  shareText: { color: '#fff', fontWeight: '700' },
+  deleteBtn: { backgroundColor: '#d9534f', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginLeft: 10 },
+  deleteText: { color: '#fff', fontWeight: '700' },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   card: { backgroundColor: '#fff', width: '100%', borderRadius: 14, padding: 16, gap: 12 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#111' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: BRAND_CHARCOAL },
   optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optionBtn: { borderWidth: 1, borderColor: '#ccc', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10 },
-  optionBtnActive: { borderColor: '#111', backgroundColor: '#111' },
-  optionText: { color: '#111', fontWeight: '700' },
+  optionBtnActive: { borderColor: BRAND_ORANGE, backgroundColor: BRAND_ORANGE },
+  optionText: { color: BRAND_CHARCOAL, fontWeight: '800' },
   optionTextActive: { color: '#fff' },
   optionBtnDisabled: { opacity: 0.4, borderStyle: 'dashed' },
-  optionTextDisabled: { color: '#666' },
-  modalActions: { marginTop: 4, flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  cancelBtn2: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 },
-  cancelText2: { color: '#333', fontWeight: '700' },
+  cancelBtn2: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
+  cancelText2: { color: '#333', fontWeight: '800' },
 });

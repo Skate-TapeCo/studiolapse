@@ -1,6 +1,7 @@
 // @ts-nocheck
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -42,7 +43,8 @@ export default function CameraScreen() {
 
   const insets = useSafeAreaInsets();
 
-  // Keep camera screen portrait; allow rotation elsewhere after we leave
+  useKeepAwake();
+
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     return () => {
@@ -110,7 +112,7 @@ export default function CameraScreen() {
       Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
     }
     setRecording(false);
-    router.back(); // player screen can now rotate because we unlock on unmount
+    router.back();
   };
 
   const startRecording = async () => {

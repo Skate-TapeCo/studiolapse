@@ -1,5 +1,6 @@
 // @ts-nocheck
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Asset } from 'expo-asset';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -17,10 +18,24 @@ type PendingExport = {
 };
 
 const PENDING_KEY = 'studiolapse:pendingExport';
+const BRAND_ORANGE = '#FF3A1E';
+const BRAND_CHARCOAL = '#2A2F33';
 
 function toFfmpegPath(uri: string) {
   const withoutScheme = uri.replace(/^file:\/\//, '');
   return withoutScheme.replace(/'/g, "'\\''");
+}
+
+async function probeDurationSec(inputPath: string) {
+  const cmd = ['-hide_banner', '-i', inputPath, '-f', 'null', '-'].join(' ');
+  const session = await FFmpegKit.execute(cmd);
+  const logs = (await session.getAllLogsAsString?.()) || '';
+  const m = logs.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+  if (!m) return 0;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const ss = parseFloat(m[3]);
+  return hh * 3600 + mm * 60 + ss;
 }
 
 export default function ExportScreen() {
@@ -43,8 +58,8 @@ export default function ExportScreen() {
       <View style={s.container}>
         <Text style={s.title}>Export</Text>
         <Text style={s.muted}>No pending export found.</Text>
-        <Pressable style={s.primary} onPress={() => router.back()}>
-          <Text style={s.primaryText}>Back</Text>
+        <Pressable style={s.charcoalBtn} onPress={() => router.back()}>
+          <Text style={s.btnText}>Back</Text>
         </Pressable>
       </View>
     );
@@ -76,7 +91,7 @@ export default function ExportScreen() {
       </View>
 
       <Pressable
-        style={[s.primary, exporting && { opacity: 0.6 }]}
+        style={[s.charcoalBtn, exporting && { opacity: 0.6 }]}
         disabled={exporting}
         onPress={async () => {
           try {
@@ -91,65 +106,106 @@ export default function ExportScreen() {
             await FileSystem.writeAsStringAsync(listPath, lines);
             setConcatPath(listPath);
 
+            let totalSec = 0;
+            for (const u of job.clipUris) {
+              const p = u.replace(/^file:\/\//, '');
+              totalSec += await probeDurationSec(p);
+            }
+            const target = Math.max(1, Number(job.targetDurationSec || 1));
+            let factor = totalSec > 0 ? totalSec / target : 1;
+            if (factor < 1) factor = 1;
+
+            const mmss = (s: number) => {
+              const m = Math.floor(s / 60);
+              const ss = Math.round(s % 60);
+              return `${m}:${ss.toString().padStart(2, '0')}`;
+            };
+
             const outPath = `${FileSystem.cacheDirectory}studiolapse_out_${Date.now()}.mp4`;
+            const wmAsset = Asset.fromModule(require('../assets/watermark.png'));
+            await wmAsset.downloadAsync();
+            const wmPath = (wmAsset.localUri || wmAsset.uri || '').replace(/^file:\/\//, '');
+
+           const filter =
+              "[1:v]format=rgba,colorchannelmixer=aa=0.8[wm0];" +
+              "[wm0][0:v]scale2ref=w=iw/3:h=-1[wm][base];" +
+              "[base][wm]overlay=x=W-w-24:y=H-h[ov];" +
+              `[ov]setpts=PTS/${factor}[v]`;
+
             const cmd = [
               '-hide_banner',
               '-y',
               '-f', 'concat',
               '-safe', '0',
               '-i', listPath,
-              '-c', 'copy',
+              '-i', wmPath,
+              '-an',
+              '-filter_complex', filter,
+              '-map', '[v]',
+              '-c:v', 'mpeg4',
+              '-q:v', '4',
+              '-movflags', '+faststart',
               outPath
-            ].map(part => (part.includes(' ') ? `"${part}"` : part)).join(' ');
+            ].map(part => (part.includes(' ') && !part.startsWith('-filter_complex') ? `"${part}"` : part)).join(' ');
 
-            setExporting(true);
-            const session = await FFmpegKit.execute(cmd);
-            const rc = await session.getReturnCode();
-            setExporting(false);
-
-            if (ReturnCode.isSuccess(rc)) {
-              const asset = await MediaLibrary.createAssetAsync(outPath);
-              const album = await MediaLibrary.getAlbumAsync('StudioLapse');
-              if (album) {
-                await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+            const doExport = async () => {
+              setExporting(true);
+              const session = await FFmpegKit.execute(cmd);
+              const rc = await session.getReturnCode();
+              const logs = (await session.getAllLogsAsString?.()) || '';
+              setExporting(false);
+              if (ReturnCode.isSuccess(rc)) {
+                const asset = await MediaLibrary.createAssetAsync(outPath);
+                const album = await MediaLibrary.getAlbumAsync('StudioLapse');
+                if (album) {
+                  await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+                } else {
+                  await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
+                }
+                Alert.alert('Exported', `Saved with watermark. Speed ≈ ${factor.toFixed(2)}x`);
               } else {
-                await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
+                Alert.alert('FFmpeg error', logs.slice(0, 1200));
               }
-              Alert.alert('Exported', 'Saved to your StudioLapse album.');
-            } else {
-              const code = rc?.getValue?.() ?? String(rc);
-              Alert.alert('FFmpeg error', `Code: ${code}`);
-            }
+            };
+
+            Alert.alert(
+              'Export summary',
+              `Clips: ${job.clipUris.length}\nTotal source: ${mmss(totalSec)}\nTarget: ${target}s\nSpeed: ~${factor.toFixed(2)}x`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Proceed', onPress: doExport }
+              ]
+            );
           } catch (e: any) {
             setExporting(false);
             Alert.alert('Error', String(e?.message || e));
           }
         }}
       >
-        <Text style={s.primaryText}>{exporting ? 'Exporting…' : 'Start Export'}</Text>
+        <Text style={s.btnText}>{exporting ? 'Exporting…' : 'Start Export'}</Text>
       </Pressable>
 
       {concatPath && (
         <Pressable
-          style={s.secondary}
+          style={s.charcoalBtn}
           onPress={async () => {
             await Clipboard.setStringAsync(concatPath);
             Alert.alert('Copied', 'Concat file path copied to clipboard.');
           }}
         >
-          <Text style={s.secondaryText}>Copy Concat Path</Text>
+          <Text style={s.btnText}>Copy Concat Path</Text>
         </Pressable>
       )}
 
       <Pressable
-        style={s.secondary}
+        style={s.charcoalBtn}
         onPress={async () => {
           await AsyncStorage.removeItem(PENDING_KEY);
           setJob(null);
           Alert.alert('Cleared', 'Pending export removed.');
         }}
       >
-        <Text style={s.secondaryText}>Clear Pending Export</Text>
+        <Text style={s.btnText}>Clear Pending Export</Text>
       </Pressable>
     </View>
   );
@@ -157,16 +213,15 @@ export default function ExportScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  title: { fontSize: 22, fontWeight: '800', marginBottom: 12, color: '#111' },
+  title: { fontSize: 22, fontWeight: '800', marginBottom: 12, color: BRAND_CHARCOAL },
   muted: { color: '#666', marginBottom: 12 },
   card: { borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 12, marginBottom: 16 },
   label: { fontSize: 12, color: '#666', marginTop: 8 },
-  value: { fontSize: 16, fontWeight: '700', color: '#111' },
+  value: { fontSize: 16, fontWeight: '700', color: BRAND_CHARCOAL },
   clipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   clipIdx: { width: 22, textAlign: 'right', color: '#555' },
   clipUri: { flex: 1, color: '#333' },
-  primary: { backgroundColor: '#1f6feb', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 10 },
-  primaryText: { color: '#fff', fontWeight: '800' },
-  secondary: { borderWidth: 1, borderColor: '#ccc', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 10 },
-  secondaryText: { color: '#111', fontWeight: '700' },
+
+  charcoalBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 10 },
+  btnText: { color: '#fff', fontWeight: '800' },
 });

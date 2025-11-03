@@ -1,25 +1,36 @@
+// @ts-nocheck
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export default function HomeTab() {
+const BRAND_ORANGE = '#FF3A1E';
+const BRAND_CHARCOAL = '#2A2F33';
+
+export default function HomeScreen() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>StudioLapse</Text>
-      <Text style={styles.subtitle}>Record an art session and save a clip</Text>
-      <TouchableOpacity style={styles.button} onPress={() => router.push('/camera')}>
-        <Text style={styles.buttonText}>Record Session</Text>
-      </TouchableOpacity>
+    <View style={s.container}>
+      <Text style={s.logo}>
+        <Text style={s.logoStudio}>Studio</Text>
+        <Text style={s.logoLapse}>Lapse</Text>
+      </Text>
+
+      <Pressable
+        onPress={() => router.push('/camera')}
+        style={s.recordBtn}
+      >
+        <Text style={s.recordText}>Record Session</Text>
+      </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container:{ flex:1, alignItems:'center', justifyContent:'center', padding:24 },
-  title:{ fontSize:28, fontWeight:'700', marginBottom:8 },
-  subtitle:{ color:'#666', marginBottom:24, textAlign:'center' },
-  button:{ backgroundColor:'#111', paddingHorizontal:20, paddingVertical:12, borderRadius:10 },
-  buttonText:{ color:'#fff', fontSize:16, fontWeight:'600' }
+const s = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#fff' },
+  logo: { fontSize: 40, fontWeight: '900', marginBottom: 28 },
+  logoStudio: { color: BRAND_CHARCOAL },
+  logoLapse: { color: BRAND_ORANGE },
+  recordBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 14, paddingHorizontal: 22, borderRadius: 10 },
+  recordText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
