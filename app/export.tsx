@@ -18,6 +18,7 @@ type PendingExport = {
 };
 
 const PENDING_KEY = 'studiolapse:pendingExport';
+const DUR_CACHE_KEY = 'studiolapse:durations';
 const BRAND_ORANGE = '#FF3A1E';
 const BRAND_CHARCOAL = '#2A2F33';
 
@@ -38,20 +39,42 @@ async function probeDurationSec(inputPath: string) {
   return hh * 3600 + mm * 60 + ss;
 }
 
+async function getClipDurationSec(uri: string) {
+  try {
+    const raw = await AsyncStorage.getItem(DUR_CACHE_KEY);
+    const cache = raw ? JSON.parse(raw) : {};
+    if (cache[uri]) return Number(cache[uri]) || 0;
+    const path = uri.replace(/^file:\/\//, '');
+    const sec = await probeDurationSec(path);
+    cache[uri] = sec;
+    await AsyncStorage.setItem(DUR_CACHE_KEY, JSON.stringify(cache));
+    return sec;
+  } catch {
+    const pathFallback = uri.replace(/^file:\/\//, '');
+    return probeDurationSec(pathFallback);
+  }
+}
+
 export default function ExportScreen() {
   const router = useRouter();
   const [job, setJob] = useState<PendingExport | null>(null);
   const [concatPath, setConcatPath] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'preparing' | 'exporting'>('idle');
+  const [dots, setDots] = useState('');
 
   const load = useCallback(async () => {
     const raw = await AsyncStorage.getItem(PENDING_KEY);
     setJob(raw ? JSON.parse(raw) : null);
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    if (status === 'idle') { setDots(''); return; }
+    const t = setInterval(() => setDots(d => (d.length >= 3 ? '' : d + '.')), 500);
+    return () => clearInterval(t);
+  }, [status]);
 
   if (!job) {
     return (
@@ -91,15 +114,19 @@ export default function ExportScreen() {
       </View>
 
       <Pressable
-        style={[s.charcoalBtn, exporting && { opacity: 0.6 }]}
-        disabled={exporting}
+        style={[s.charcoalBtn, (exporting || status !== 'idle') && { opacity: 0.6 }]}
+        disabled={exporting || status !== 'idle'}
         onPress={async () => {
           try {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status !== 'granted') {
+            const { status: perm } = await MediaLibrary.requestPermissionsAsync();
+            if (perm !== 'granted') {
               Alert.alert('Permission needed', 'Media Library permission is required.');
               return;
             }
+
+            setStatus('preparing');
+            setExporting(true);
+            await new Promise(r => setTimeout(r, 50));
 
             const lines = job.clipUris.map((u) => `file '${toFfmpegPath(u)}'`).join('\n');
             const listPath = `${FileSystem.cacheDirectory}studiolapse_concat_${Date.now()}.txt`;
@@ -108,8 +135,7 @@ export default function ExportScreen() {
 
             let totalSec = 0;
             for (const u of job.clipUris) {
-              const p = u.replace(/^file:\/\//, '');
-              totalSec += await probeDurationSec(p);
+              totalSec += await getClipDurationSec(u);
             }
             const target = Math.max(1, Number(job.targetDurationSec || 1));
             let factor = totalSec > 0 ? totalSec / target : 1;
@@ -126,11 +152,11 @@ export default function ExportScreen() {
             await wmAsset.downloadAsync();
             const wmPath = (wmAsset.localUri || wmAsset.uri || '').replace(/^file:\/\//, '');
 
-           const filter =
+            const filter =
               "[1:v]format=rgba,colorchannelmixer=aa=0.8[wm0];" +
               "[wm0][0:v]scale2ref=w=iw/3:h=-1[wm][base];" +
-              "[base][wm]overlay=x=W-w-24:y=H-h[ov];" +
-              `[ov]setpts=PTS/${factor}[v]`;
+              "[base][wm]overlay=x=W-w-24:y=H-h[tmp];" +
+              `[tmp]setpts=PTS/${factor}[v]`;
 
             const cmd = [
               '-hide_banner',
@@ -144,16 +170,23 @@ export default function ExportScreen() {
               '-map', '[v]',
               '-c:v', 'mpeg4',
               '-q:v', '4',
+              '-vsync', 'vfr',
+              '-fps_mode', 'vfr',
               '-movflags', '+faststart',
               outPath
             ].map(part => (part.includes(' ') && !part.startsWith('-filter_complex') ? `"${part}"` : part)).join(' ');
 
             const doExport = async () => {
+              setStatus('exporting');
               setExporting(true);
+
               const session = await FFmpegKit.execute(cmd);
               const rc = await session.getReturnCode();
               const logs = (await session.getAllLogsAsString?.()) || '';
+
               setExporting(false);
+              setStatus('idle');
+
               if (ReturnCode.isSuccess(rc)) {
                 const asset = await MediaLibrary.createAssetAsync(outPath);
                 const album = await MediaLibrary.getAlbumAsync('StudioLapse');
@@ -172,17 +205,20 @@ export default function ExportScreen() {
               'Export summary',
               `Clips: ${job.clipUris.length}\nTotal source: ${mmss(totalSec)}\nTarget: ${target}s\nSpeed: ~${factor.toFixed(2)}x`,
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: 'Cancel', style: 'cancel', onPress: () => { setExporting(false); setStatus('idle'); } },
                 { text: 'Proceed', onPress: doExport }
               ]
             );
           } catch (e: any) {
             setExporting(false);
+            setStatus('idle');
             Alert.alert('Error', String(e?.message || e));
           }
         }}
       >
-        <Text style={s.btnText}>{exporting ? 'Exporting…' : 'Start Export'}</Text>
+        <Text style={s.btnText}>
+          {status === 'preparing' ? `Preparing${dots}` : exporting ? `Exporting${dots}` : 'Start Export'}
+        </Text>
       </Pressable>
 
       {concatPath && (

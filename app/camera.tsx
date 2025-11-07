@@ -93,27 +93,25 @@ export default function CameraScreen() {
 
   const onReady = () => setReady(true);
 
-  const saveVideo = async (uri?: string) => {
-    if (!uri) return;
-    if (!selectedProjectId) {
-      Alert.alert('Select a project', 'Open the Projects tab and tap a project first.');
-      setRecording(false);
-      return;
-    }
-    if (hasLib) {
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
-    }
-    const clip = { uri, createdAt: Date.now() };
-    try {
-      await addClipToProject(selectedProjectId, clip);
-      Alert.alert('Saved', 'Clip saved and linked to your project.');
-    } catch (e: any) {
-      Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
-    }
-    setRecording(false);
-    router.back();
-  };
+const saveVideo = async (uri?: string) => {
+  if (!uri) return;
+  if (!selectedProjectId) {
+    Alert.alert('Select a project', 'Open the Projects tab and tap a project first.');
+    return;
+  }
+  if (hasLib) {
+    const asset = await MediaLibrary.createAssetAsync(uri);
+    await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
+  }
+  const clip = { uri, createdAt: Date.now() };
+  try {
+    await addClipToProject(selectedProjectId, clip);
+    Alert.alert('Saved', 'Clip saved and linked to your project.');
+  } catch (e: any) {
+    Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
+  }
+  router.back();
+};
 
   const startRecording = async () => {
     if (!ready || !camRef.current) {
@@ -144,12 +142,13 @@ export default function CameraScreen() {
     }
   };
 
-  const stopRecording = async () => {
-    const inst: any = camRef.current;
-    try {
-      if (typeof inst.stopRecording === 'function') await inst.stopRecording();
-    } catch {}
-  };
+const stopRecording = async () => {
+  setRecording(false); // instantly update UI
+  const inst: any = camRef.current;
+  try {
+    if (typeof inst.stopRecording === 'function') await inst.stopRecording();
+  } catch {}
+};
 
   return (
     <SafeAreaView style={s.full} edges={['top','bottom','left','right']}>
