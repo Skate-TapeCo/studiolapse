@@ -43,6 +43,17 @@ export default function CameraScreen() {
 
   const insets = useSafeAreaInsets();
 
+  const [saving, setSaving] = useState(false);
+  const stoppingRef = useRef(false);
+  const [dots, setDots] = useState('');
+  useEffect(() => {
+    if (!saving) { setDots(''); return; }
+    const t = setInterval(() => setDots(d => (d.length >= 3 ? '' : d + '.')), 500);
+    return () => clearInterval(t);
+  }, [saving]);
+
+  const [zoom, setZoom] = useState(0); // 0 to 1
+
   useKeepAwake();
 
   useEffect(() => {
@@ -93,65 +104,84 @@ export default function CameraScreen() {
 
   const onReady = () => setReady(true);
 
-const saveVideo = async (uri?: string) => {
-  if (!uri) return;
-  if (!selectedProjectId) {
-    Alert.alert('Select a project', 'Open the Projects tab and tap a project first.');
-    return;
-  }
-  if (hasLib) {
-    const asset = await MediaLibrary.createAssetAsync(uri);
-    await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
-  }
-  const clip = { uri, createdAt: Date.now() };
-  try {
-    await addClipToProject(selectedProjectId, clip);
-    Alert.alert('Saved', 'Clip saved and linked to your project.');
-  } catch (e: any) {
-    Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
-  }
-  router.back();
-};
-
-  const startRecording = async () => {
-    if (!ready || !camRef.current) {
-      Alert.alert('One sec', 'Camera is still starting. Try again in a moment.');
+  const saveVideo = async (uri?: string) => {
+    if (!uri) return;
+    if (!selectedProjectId) {
+      Alert.alert('Select a project', 'Open the Projects tab and tap a project first.');
       return;
     }
-    setRecording(true);
-    const inst: any = camRef.current;
+
+    setSaving(true);
     try {
-      if (typeof inst.startRecording === 'function') {
-        await inst.startRecording({
-          onRecordingFinished: (video: any) => saveVideo(video?.uri),
-          onRecordingError: (e: any) => {
-            setRecording(false);
-            Alert.alert('Error', `Recording failed: ${e?.message || String(e)}`);
-          },
-        });
-      } else if (typeof inst.recordAsync === 'function') {
-        const video = await inst.recordAsync();
-        await saveVideo(video?.uri);
-      } else {
-        setRecording(false);
-        Alert.alert('Error', 'This build does not expose a recording method on CameraView.');
+      if (hasLib) {
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
       }
+
+      const clip = { uri, createdAt: Date.now() };
+      await addClipToProject(selectedProjectId, clip);
+
+      Alert.alert('Saved', 'Clip saved and linked to your project.');
+      router.back();
     } catch (e: any) {
-      setRecording(false);
-      Alert.alert('Error', `Could not start recording: ${e?.message || String(e)}`);
+      Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
+    } finally {
+      setSaving(false);
     }
   };
 
-const stopRecording = async () => {
-  setRecording(false); // instantly update UI
+ const startRecording = async () => {
+  if (!ready || !camRef.current) {
+    Alert.alert('One sec', 'Camera is still starting. Try again in a moment.');
+    return;
+  }
+
+  const inst: any = camRef.current;
+  stoppingRef.current = false;
+  setRecording(true);
+
+  try {
+    if (typeof inst.startRecording === 'function') {
+      await inst.startRecording({
+        onRecordingFinished: (video: any) => saveVideo(video?.uri),
+        onRecordingError: (e: any) => {
+          setRecording(false);
+          Alert.alert('Error', `Recording failed: ${e?.message || String(e)}`);
+        },
+      });
+    } else if (typeof inst.recordAsync === 'function') {
+      try {
+        const video = await inst.recordAsync();
+        await saveVideo(video?.uri);
+      } catch (e: any) {
+        setRecording(false);
+        Alert.alert('Error', `Recording failed: ${e?.message || String(e)}`);
+      }
+    } else {
+      setRecording(false);
+      Alert.alert('Error', 'This build does not expose a recording method.');
+    }
+  } catch (e: any) {
+    setRecording(false);
+    Alert.alert('Error', `Could not start recording: ${e?.message || String(e)}`);
+  }
+};
+
+  const stopRecording = async () => {
+  if (stoppingRef.current) return;
+  stoppingRef.current = true;
+  setRecording(false);
+
   const inst: any = camRef.current;
   try {
-    if (typeof inst.stopRecording === 'function') await inst.stopRecording();
+    if (typeof inst.stopRecording === 'function') {
+      inst.stopRecording(); // works for both APIs when available
+    }
   } catch {}
 };
 
   return (
-    <SafeAreaView style={s.full} edges={['top','bottom','left','right']}>
+    <SafeAreaView style={s.full}>
       <View style={s.previewWrap}>
         <CameraView
           ref={camRef}
@@ -160,6 +190,7 @@ const stopRecording = async () => {
           mode="video"
           videoQuality="720p"
           ratio="16:9"
+          zoom={zoom}
           onCameraReady={onReady}
         />
       </View>
@@ -174,6 +205,29 @@ const stopRecording = async () => {
         </View>
       )}
 
+      {saving && (
+        <View style={[s.indicator, { top: insets.top + 60, left: 16 }]}>
+          <Text style={s.timer}>Saving{dots}</Text>
+        </View>
+      )}
+
+{/* Zoom Controls */}
+<View style={s.zoomWrap}>
+  <TouchableOpacity
+    onPress={() => setZoom(z => Math.max(0, z - 0.1))}
+    style={s.zoomBtn}
+  >
+    <Text style={s.zoomText}>–</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => setZoom(z => Math.min(1, z + 0.1))}
+    style={s.zoomBtn}
+  >
+    <Text style={s.zoomText}>+</Text>
+  </TouchableOpacity>
+</View>
+
       <View style={[s.controls, { marginBottom: insets.bottom + 20 }]}>
         {!recording ? (
           <TouchableOpacity
@@ -182,7 +236,10 @@ const stopRecording = async () => {
             disabled={!ready}
           />
         ) : (
-          <TouchableOpacity onPress={stopRecording} style={[s.btn, { backgroundColor: 'white' }]} />
+          <TouchableOpacity
+            onPress={stopRecording}
+            style={[s.btn, { backgroundColor: 'white' }]}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -197,9 +254,34 @@ const s = StyleSheet.create({
   controls: { position: 'absolute', bottom: 0, width: '100%', alignItems: 'center' },
   btn: { width: 72, height: 72, borderRadius: 36 },
   indicator: {
-    position: 'absolute', flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8
   },
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: 'red', marginRight: 8 },
   timer: { color: 'white', fontSize: 16, fontWeight: '600' },
+  zoomWrap: {
+  position: 'absolute',
+  right: 20,
+  bottom: 140,
+  alignItems: 'center',
+  gap: 12,
+},
+zoomBtn: {
+  width: 44,
+  height: 44,
+  borderRadius: 8,
+  backgroundColor: 'rgba(0,0,0,0.4)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+zoomText: {
+  color: 'white',
+  fontSize: 28,
+  fontWeight: '700',
+},
 });
