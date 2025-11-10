@@ -156,7 +156,7 @@ export default function ExportScreen() {
               "[1:v]format=rgba,colorchannelmixer=aa=0.8[wm0];" +
               "[wm0][0:v]scale2ref=w=iw/3:h=-1[wm][base];" +
               "[base][wm]overlay=x=W-w-24:y=H-h[tmp];" +
-              `[tmp]setpts=PTS/${factor}[v]`;
+              `[tmp]setpts=PTS/${factor},scale=-2:720,fps=30[v]`;
 
             const cmd = [
               '-hide_banner',
@@ -169,9 +169,10 @@ export default function ExportScreen() {
               '-filter_complex', filter,
               '-map', '[v]',
               '-c:v', 'mpeg4',
-              '-q:v', '4',
+              '-q:v', '5',
               '-vsync', 'vfr',
               '-fps_mode', 'vfr',
+              '-threads', '0',
               '-movflags', '+faststart',
               outPath
             ].map(part => (part.includes(' ') && !part.startsWith('-filter_complex') ? `"${part}"` : part)).join(' ');
