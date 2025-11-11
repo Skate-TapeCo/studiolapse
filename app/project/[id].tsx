@@ -2,13 +2,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { FFmpegKit } from 'kroog-ffmpeg-kit-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useProject } from '../../src/context/ProjectContext';
 
 export const options = { title: '' };
 
 const PROJECTS_KEY = 'studiolapse:projects';
+const PENDING_KEY = 'studiolapse:pendingExport';
+const DUR_CACHE_KEY = 'studiolapse:durations';
+
 const BRAND_ORANGE = '#FF3A1E';
 const BRAND_CHARCOAL = '#2A2F33';
 const BRAND_RED = '#b02727';
@@ -42,6 +46,36 @@ async function renameProject(projectId: string, newName: string) {
   return updated.find((p: any) => p.id === projectId) || null;
 }
 
+function mmss(totalSec?: number) {
+  if (!totalSec || totalSec <= 0 || !isFinite(totalSec)) return '—';
+  const m = Math.floor(totalSec / 60);
+  const s = Math.round(totalSec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+async function probeDurationSec(inputPath: string) {
+  const cmd = `-hide_banner -i "${inputPath}" -f null -`;
+  const session = await FFmpegKit.execute(cmd);
+  const logs = (await session.getAllLogsAsString?.()) || '';
+  const m = logs.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+  if (!m) return 0;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const ss = parseFloat(m[3]);
+  return hh * 3600 + mm * 60 + ss;
+}
+
+async function getClipDurationSec(uri: string) {
+  const raw = await AsyncStorage.getItem(DUR_CACHE_KEY);
+  const cache = raw ? JSON.parse(raw) : {};
+  if (cache[uri]) return Number(cache[uri]) || 0;
+  const path = uri.replace(/^file:\/\//, '');
+  const sec = await probeDurationSec(path);
+  cache[uri] = sec;
+  await AsyncStorage.setItem(DUR_CACHE_KEY, JSON.stringify(cache));
+  return sec;
+}
+
 export default function ProjectDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -52,6 +86,8 @@ export default function ProjectDetail() {
   const [editName, setEditName] = useState('');
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [targetDurationSec, setTargetDurationSec] = useState<number | null>(null);
+
+  const [durations, setDurations] = useState<Record<string, number>>({});
 
   const loadProject = useCallback(async () => {
     const raw = await AsyncStorage.getItem(PROJECTS_KEY);
@@ -67,6 +103,21 @@ export default function ProjectDetail() {
   useEffect(() => { loadProject(); }, [loadProject]);
 
   useFocusEffect(useCallback(() => { loadProject(); }, [loadProject]));
+
+  useEffect(() => {
+    (async () => {
+      if (!project?.clips?.length) return;
+      const next: Record<string, number> = { ...durations };
+      for (const c of project.clips) {
+        if (!next[c.uri]) {
+          try {
+            next[c.uri] = await getClipDurationSec(c.uri);
+            setDurations({ ...next });
+          } catch {}
+        }
+      }
+    })();
+  }, [project?.clips]);
 
   const beginExport = async () => {
     if (!project) return;
@@ -89,7 +140,7 @@ export default function ProjectDetail() {
       clipUris: sorted.map((c) => String(c.uri)),
       createdAt: Date.now(),
     };
-    await AsyncStorage.setItem('studiolapse:pendingExport', JSON.stringify(payload));
+    await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(payload));
     router.push('/export');
   };
 
@@ -199,22 +250,7 @@ export default function ProjectDetail() {
             >
               <Text style={s.clipTitle}>Clip {total - index}</Text>
               <Text style={s.clipMeta}>{new Date(item.createdAt).toLocaleString()}</Text>
-              <Text style={s.uri} numberOfLines={1}>{item.uri}</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={async () => {
-                try {
-                  await Share.share({
-                    title: `Clip ${total - index}`,
-                    message: item.uri,
-                    url: item.uri,
-                  });
-                } catch {}
-              }}
-              style={s.shareBtn}
-            >
-              <Text style={s.shareText}>Share</Text>
+              <Text style={s.duration}>Length: {mmss(durations[item.uri])}</Text>
             </Pressable>
 
             <Pressable
@@ -308,9 +344,8 @@ const s = StyleSheet.create({
   clipRow: { paddingVertical: 12, borderBottomWidth: 1, borderColor: '#eee', flexDirection: 'row', alignItems: 'center' },
   clipTitle: { fontSize: 16, fontWeight: '600', color: BRAND_CHARCOAL },
   clipMeta: { color: '#666', marginBottom: 4 },
-  uri: { fontSize: 12, color: '#444' },
-  shareBtn: { backgroundColor: '#444', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginLeft: 10 },
-  shareText: { color: '#fff', fontWeight: '700' },
+  duration: { fontSize: 12, color: '#444' },
+
   deleteBtn: { backgroundColor: '#d9534f', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginLeft: 10 },
   deleteText: { color: '#fff', fontWeight: '700' },
 
