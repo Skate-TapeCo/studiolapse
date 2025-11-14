@@ -40,19 +40,21 @@ export default function CameraScreen() {
   const [ready, setReady] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [blink, setBlink] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dots, setDots] = useState('');
+  const [zoom, setZoom] = useState(0); // 0 to 1
 
+  const stoppingRef = useRef(false);
   const insets = useSafeAreaInsets();
 
-  const [saving, setSaving] = useState(false);
-  const stoppingRef = useRef(false);
-  const [dots, setDots] = useState('');
   useEffect(() => {
-    if (!saving) { setDots(''); return; }
-    const t = setInterval(() => setDots(d => (d.length >= 3 ? '' : d + '.')), 500);
+    if (!saving) {
+      setDots('');
+      return;
+    }
+    const t = setInterval(() => setDots((d) => (d.length >= 3 ? '' : d + '.')), 500);
     return () => clearInterval(t);
   }, [saving]);
-
-  const [zoom, setZoom] = useState(0); // 0 to 1
 
   useKeepAwake();
 
@@ -85,23 +87,6 @@ export default function CameraScreen() {
     return () => clearInterval(t);
   }, [recording]);
 
-  if (!camPerm || !micPerm) {
-    return <View style={s.center}><Text>Checking permissions…</Text></View>;
-  }
-
-  if (!camPerm.granted || !micPerm.granted) {
-    return (
-      <View style={s.center}>
-        <Text style={{ marginBottom: 10, textAlign: 'center' }}>
-          StudioLapse needs Camera and Microphone permissions.
-        </Text>
-        {!camPerm.granted && <Button title="Grant Camera" onPress={requestCamPerm} />}
-        {!micPerm.granted && <View style={{ height: 8 }} />}
-        {!micPerm.granted && <Button title="Grant Microphone" onPress={requestMicPerm} />}
-      </View>
-    );
-  }
-
   const onReady = () => setReady(true);
 
   const saveVideo = async (uri?: string) => {
@@ -124,61 +109,105 @@ export default function CameraScreen() {
       Alert.alert('Saved', 'Clip saved and linked to your project.');
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', `Saved to gallery, but could not link to project: ${e?.message || String(e)}`);
+      Alert.alert(
+        'Error',
+        `Saved to gallery, but could not link to project: ${e?.message || String(e)}`
+      );
     } finally {
       setSaving(false);
     }
   };
 
- const startRecording = async () => {
-  if (!ready || !camRef.current) {
-    Alert.alert('One sec', 'Camera is still starting. Try again in a moment.');
-    return;
-  }
+  const startRecording = async () => {
+    if (!ready || !camRef.current) {
+      Alert.alert('One sec', 'Camera is still starting. Try again in a moment.');
+      return;
+    }
 
-  const inst: any = camRef.current;
-  stoppingRef.current = false;
-  setRecording(true);
+    const inst: any = camRef.current;
+    stoppingRef.current = false;
+    setRecording(true);
 
-  try {
-    if (typeof inst.startRecording === 'function') {
-      await inst.startRecording({
-        onRecordingFinished: (video: any) => saveVideo(video?.uri),
-        onRecordingError: (e: any) => {
+    try {
+      if (typeof inst.startRecording === 'function') {
+        await inst.startRecording({
+          onRecordingFinished: (video: any) => saveVideo(video?.uri),
+          onRecordingError: (e: any) => {
+            setRecording(false);
+            Alert.alert('Error', `Recording failed: ${e?.message || String(e)}`);
+          },
+        });
+      } else if (typeof inst.recordAsync === 'function') {
+        try {
+          const video = await inst.recordAsync();
+          await saveVideo(video?.uri);
+        } catch (e: any) {
           setRecording(false);
           Alert.alert('Error', `Recording failed: ${e?.message || String(e)}`);
-        },
-      });
-    } else if (typeof inst.recordAsync === 'function') {
-      try {
-        const video = await inst.recordAsync();
-        await saveVideo(video?.uri);
-      } catch (e: any) {
+        }
+      } else {
         setRecording(false);
-        Alert.alert('Error', `Recording failed: ${e?.message || String(e)}`);
+        Alert.alert('Error', 'This build does not expose a recording method.');
       }
-    } else {
+    } catch (e: any) {
       setRecording(false);
-      Alert.alert('Error', 'This build does not expose a recording method.');
+      Alert.alert('Error', `Could not start recording: ${e?.message || String(e)}`);
     }
-  } catch (e: any) {
-    setRecording(false);
-    Alert.alert('Error', `Could not start recording: ${e?.message || String(e)}`);
-  }
-};
+  };
 
   const stopRecording = async () => {
-  if (stoppingRef.current) return;
-  stoppingRef.current = true;
-  setRecording(false);
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    setRecording(false);
 
-  const inst: any = camRef.current;
-  try {
-    if (typeof inst.stopRecording === 'function') {
-      inst.stopRecording(); // works for both APIs when available
-    }
-  } catch {}
-};
+    const inst: any = camRef.current;
+    try {
+      if (typeof inst.stopRecording === 'function') {
+        inst.stopRecording();
+      }
+    } catch {}
+  };
+
+  // 🔴 IMPORTANT: this check must come *after* all hooks above,
+  // so the hook order is always the same on every render.
+  if (!selectedProjectId) {
+    return (
+      <SafeAreaView style={s.center} edges={['top', 'bottom', 'left', 'right']}>
+        <Text style={{ textAlign: 'center', marginBottom: 12 }}>
+          Open the Projects tab and select a project before recording.
+        </Text>
+        <Button
+          title="Go to Projects"
+          onPress={() => router.replace('/(tabs)/projects')}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (!camPerm || !micPerm) {
+    return (
+      <View style={s.center}>
+        <Text>Checking permissions…</Text>
+      </View>
+    );
+  }
+
+  if (!camPerm.granted || !micPerm.granted) {
+    return (
+      <View style={s.center}>
+        <Text style={{ marginBottom: 10, textAlign: 'center' }}>
+          StudioLapse needs Camera and Microphone permissions.
+        </Text>
+        {!camPerm.granted && (
+          <Button title="Grant Camera" onPress={requestCamPerm} />
+        )}
+        {!micPerm.granted && <View style={{ height: 8 }} />}
+        {!micPerm.granted && (
+          <Button title="Grant Microphone" onPress={requestMicPerm} />
+        )}
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={s.full}>
@@ -211,22 +240,22 @@ export default function CameraScreen() {
         </View>
       )}
 
-{/* Zoom Controls */}
-<View style={s.zoomWrap}>
-  <TouchableOpacity
-    onPress={() => setZoom(z => Math.max(0, z - 0.1))}
-    style={s.zoomBtn}
-  >
-    <Text style={s.zoomText}>–</Text>
-  </TouchableOpacity>
+      {/* Zoom controls */}
+      <View style={s.zoomWrap}>
+        <TouchableOpacity
+          onPress={() => setZoom((z) => Math.max(0, z - 0.1))}
+          style={s.zoomBtn}
+        >
+          <Text style={s.zoomText}>–</Text>
+        </TouchableOpacity>
 
-  <TouchableOpacity
-    onPress={() => setZoom(z => Math.min(1, z + 0.1))}
-    style={s.zoomBtn}
-  >
-    <Text style={s.zoomText}>+</Text>
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity
+          onPress={() => setZoom((z) => Math.min(1, z + 0.1))}
+          style={s.zoomBtn}
+        >
+          <Text style={s.zoomText}>+</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={[s.controls, { marginBottom: insets.bottom + 20 }]}>
         {!recording ? (
@@ -248,7 +277,12 @@ export default function CameraScreen() {
 
 const s = StyleSheet.create({
   full: { flex: 1, backgroundColor: '#000' },
-  previewWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
+  previewWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+  },
   preview: { width: '100%', height: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   controls: { position: 'absolute', bottom: 0, width: '100%', alignItems: 'center' },
@@ -260,28 +294,28 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8
+    borderRadius: 8,
   },
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: 'red', marginRight: 8 },
   timer: { color: 'white', fontSize: 16, fontWeight: '600' },
   zoomWrap: {
-  position: 'absolute',
-  right: 20,
-  bottom: 140,
-  alignItems: 'center',
-  gap: 12,
-},
-zoomBtn: {
-  width: 44,
-  height: 44,
-  borderRadius: 8,
-  backgroundColor: 'rgba(0,0,0,0.4)',
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-zoomText: {
-  color: 'white',
-  fontSize: 28,
-  fontWeight: '700',
-},
+    position: 'absolute',
+    right: 20,
+    bottom: 140,
+    alignItems: 'center',
+    gap: 12,
+  },
+  zoomBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomText: {
+    color: 'white',
+    fontSize: 28,
+    fontWeight: '700',
+  },
 });

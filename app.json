@@ -3,28 +3,24 @@
     "name": "StudioLapse",
     "slug": "StudioLapse",
     "icon": "./assets/icon.png",
-
     "orientation": "default",
-
     "android": {
-  "package": "com.studiolapse.studiolapse",
-  "edgeToEdgeEnabled": true,
-  "permissions": [
-    "CAMERA",
-    "RECORD_AUDIO",
-    "FOREGROUND_SERVICE_CAMERA",
-    "READ_MEDIA_VIDEO"
-  ],
-  "adaptiveIcon": {
-    "backgroundColor": "#2A2F33"
-  }
+      "package": "com.studiolapse.studiolapse",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "FOREGROUND_SERVICE_CAMERA",
+        "READ_MEDIA_VIDEO"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#2A2F33"
+      }
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -34,24 +30,29 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
-          "dark": { "backgroundColor": "#000000" }
+          "dark": {
+            "backgroundColor": "#000000"
+          }
         }
       ],
-      ["expo-camera", { "recordAudioAndroid": true }]
+      [
+        "expo-camera",
+        {
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-web-browser"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "router": {},
       "eas": {
         "projectId": "d8cad134-44fb-4fc3-83c6-b8c5d90a3b66"
       }
     },
-
     "owner": "studiolapse"
   }
 }
