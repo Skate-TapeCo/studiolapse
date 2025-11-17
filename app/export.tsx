@@ -147,10 +147,15 @@ export default function ExportScreen() {
               return `${m}:${ss.toString().padStart(2, '0')}`;
             };
 
-            const outPath = `${FileSystem.cacheDirectory}studiolapse_out_${Date.now()}.mp4`;
-            const wmAsset = Asset.fromModule(require('../assets/watermark.png'));
-            await wmAsset.downloadAsync();
-            const wmPath = (wmAsset.localUri || wmAsset.uri || '').replace(/^file:\/\//, '');
+           const outPath = `${FileSystem.cacheDirectory}studiolapse_out_${Date.now()}.mp4`;
+           const wmAsset = Asset.fromModule(require('../assets/watermark.png'));
+           await wmAsset.downloadAsync();
+
+           const wmLocal = wmAsset.localUri;
+           if (!wmLocal) {
+             throw new Error('Watermark file not available on device');
+           }
+           const wmPath = wmLocal.replace(/^file:\/\//, '');
 
             const filter =
               "[1:v]format=rgba,colorchannelmixer=aa=0.8[wm0];" +

@@ -110,7 +110,7 @@ export default function CameraScreen() {
       await addClipToProject(selectedProjectId, clip);
 
       Alert.alert('Saved', 'Clip saved and linked to your project.');
-      router.back();
+      router.replace(`/project/${selectedProjectId}`);
     } catch (e: any) {
       Alert.alert(
         'Error',
