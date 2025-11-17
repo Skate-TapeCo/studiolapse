@@ -11,8 +11,9 @@ const BRAND_CHARCOAL = '#2A2F33';
 export default function TabLayout() {
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
-        headerShown: false,              // ← no headers anywhere
+        headerShown: false,
         tabBarActiveTintColor: BRAND_ORANGE,
         tabBarInactiveTintColor: BRAND_CHARCOAL,
         tabBarButton: HapticTab,

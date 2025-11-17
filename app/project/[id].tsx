@@ -7,8 +7,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useProject } from '../../src/context/ProjectContext';
 
-export const options = { title: '' };
-
 const PROJECTS_KEY = 'studiolapse:projects';
 const PENDING_KEY = 'studiolapse:pendingExport';
 const DUR_CACHE_KEY = 'studiolapse:durations';
@@ -17,10 +15,10 @@ const BRAND_ORANGE = '#FF3A1E';
 const BRAND_CHARCOAL = '#2A2F33';
 const BRAND_RED = '#b02727';
 
-async function deleteClip(projectId: string, clipIndex: number) {
+async function deleteClip(projectId, clipIndex) {
   const raw = await AsyncStorage.getItem(PROJECTS_KEY);
   const list = raw ? JSON.parse(raw) : [];
-  const updated = list.map((p: any) => {
+  const updated = list.map((p) => {
     if (p.id !== projectId) return p;
     const newClips = Array.isArray(p.clips) ? [...p.clips] : [];
     newClips.splice(clipIndex, 1);
@@ -29,31 +27,31 @@ async function deleteClip(projectId: string, clipIndex: number) {
   await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(updated));
 }
 
-async function deleteProject(projectId: string, router: any) {
+async function deleteProject(projectId, router) {
   const raw = await AsyncStorage.getItem(PROJECTS_KEY);
   const list = raw ? JSON.parse(raw) : [];
-  const updated = list.filter((p: any) => p.id !== projectId);
+  const updated = list.filter((p) => p.id !== projectId);
   await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(updated));
   router.replace('/(tabs)/projects');
 }
 
-async function renameProject(projectId: string, newName: string) {
+async function renameProject(projectId, newName) {
   const name = (newName || '').trim() || 'Untitled';
   const raw = await AsyncStorage.getItem(PROJECTS_KEY);
   const list = raw ? JSON.parse(raw) : [];
-  const updated = list.map((p: any) => (p.id === projectId ? { ...p, name } : p));
+  const updated = list.map((p) => (p.id === projectId ? { ...p, name } : p));
   await AsyncStorage.setItem(PROJECTS_KEY, JSON.stringify(updated));
-  return updated.find((p: any) => p.id === projectId) || null;
+  return updated.find((p) => p.id === projectId) || null;
 }
 
-function mmss(totalSec?: number) {
+function mmss(totalSec) {
   if (!totalSec || totalSec <= 0 || !isFinite(totalSec)) return '—';
   const m = Math.floor(totalSec / 60);
   const s = Math.round(totalSec % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-async function probeDurationSec(inputPath: string) {
+async function probeDurationSec(inputPath) {
   const cmd = `-hide_banner -i "${inputPath}" -f null -`;
   const session = await FFmpegKit.execute(cmd);
   const logs = (await session.getAllLogsAsString?.()) || '';
@@ -65,7 +63,7 @@ async function probeDurationSec(inputPath: string) {
   return hh * 3600 + mm * 60 + ss;
 }
 
-async function getClipDurationSec(uri: string) {
+async function getClipDurationSec(uri) {
   const raw = await AsyncStorage.getItem(DUR_CACHE_KEY);
   const cache = raw ? JSON.parse(raw) : {};
   if (cache[uri]) return Number(cache[uri]) || 0;
@@ -81,18 +79,24 @@ export default function ProjectDetail() {
   const router = useRouter();
   const { setSelectedProjectId } = useProject();
 
-  const [project, setProject] = useState<any | null>(null);
+  const [project, setProject] = useState(null);
   const [renaming, setRenaming] = useState(false);
   const [editName, setEditName] = useState('');
   const [exportModalVisible, setExportModalVisible] = useState(false);
-  const [targetDurationSec, setTargetDurationSec] = useState<number | null>(null);
+  const [targetDurationSec, setTargetDurationSec] = useState(null);
 
-  const [durations, setDurations] = useState<Record<string, number>>({});
+  const [durations, setDurations] = useState({});
+
+  useEffect(() => {
+    if (!router.canGoBack()) {
+      router.replace('/(tabs)/index');
+    }
+  }, []);
 
   const loadProject = useCallback(async () => {
     const raw = await AsyncStorage.getItem(PROJECTS_KEY);
     const list = raw ? JSON.parse(raw) : [];
-    const found = list.find((p: any) => p.id === String(id)) || null;
+    const found = list.find((p) => p.id === String(id)) || null;
     if (found && Array.isArray(found.clips)) {
       found.clips = [...found.clips].sort((a, b) => b.createdAt - a.createdAt);
     }
@@ -107,7 +111,7 @@ export default function ProjectDetail() {
   useEffect(() => {
     (async () => {
       if (!project?.clips?.length) return;
-      const next: Record<string, number> = { ...durations };
+      const next = { ...durations };
       for (const c of project.clips) {
         if (!next[c.uri]) {
           try {
@@ -162,7 +166,7 @@ export default function ProjectDetail() {
       <Pressable
         onPress={() => {
           setSelectedProjectId(project.id);
-          router.push('/camera');
+          router.replace('/camera');
         }}
         style={s.recordBtn}
       >
@@ -316,39 +320,31 @@ const s = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   title: { fontSize: 22, fontWeight: '700', marginBottom: 12, color: BRAND_CHARCOAL },
   muted: { color: '#666' },
-
   recordBtn: { backgroundColor: BRAND_ORANGE, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginBottom: 12, alignSelf: 'flex-start' },
   recordText: { color: '#fff', fontWeight: '800' },
-
   exportRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   durationBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start' },
   durationText: { color: '#fff', fontWeight: '800' },
   chosenText: { color: '#555' },
-
   combineBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginBottom: 16, alignSelf: 'flex-start' },
   combineText: { color: '#fff', fontWeight: '800' },
-
   actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   renameBtn: { backgroundColor: BRAND_CHARCOAL, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   renameText: { color: '#fff', fontWeight: '800' },
   deleteProjectBtn: { backgroundColor: BRAND_RED, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   deleteProjectText: { color: '#fff', fontWeight: '800' },
-
   renameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 10, paddingHorizontal: 10, height: 40 },
   saveBtn: { backgroundColor: BRAND_ORANGE, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   saveText: { color: '#fff', fontWeight: '800' },
   cancelBtn: { backgroundColor: '#eee', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   cancelText: { color: '#333', fontWeight: '800' },
-
   clipRow: { paddingVertical: 12, borderBottomWidth: 1, borderColor: '#eee', flexDirection: 'row', alignItems: 'center' },
   clipTitle: { fontSize: 16, fontWeight: '600', color: BRAND_CHARCOAL },
   clipMeta: { color: '#666', marginBottom: 4 },
   duration: { fontSize: 12, color: '#444' },
-
   deleteBtn: { backgroundColor: '#d9534f', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginLeft: 10 },
   deleteText: { color: '#fff', fontWeight: '700' },
-
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   card: { backgroundColor: '#fff', width: '100%', borderRadius: 14, padding: 16, gap: 12 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: BRAND_CHARCOAL },

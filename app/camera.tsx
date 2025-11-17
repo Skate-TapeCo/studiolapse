@@ -42,19 +42,10 @@ export default function CameraScreen() {
   const [blink, setBlink] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dots, setDots] = useState('');
-  const [zoom, setZoom] = useState(0); // 0 to 1
+  const [zoom, setZoom] = useState(0);
 
   const stoppingRef = useRef(false);
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    if (!saving) {
-      setDots('');
-      return;
-    }
-    const t = setInterval(() => setDots((d) => (d.length >= 3 ? '' : d + '.')), 500);
-    return () => clearInterval(t);
-  }, [saving]);
 
   useKeepAwake();
 
@@ -86,6 +77,18 @@ export default function CameraScreen() {
     }
     return () => clearInterval(t);
   }, [recording]);
+
+  useEffect(() => {
+    if (!saving) {
+      setDots('');
+      return;
+    }
+    const t = setInterval(
+      () => setDots((d) => (d.length >= 3 ? '' : d + '.')),
+      500
+    );
+    return () => clearInterval(t);
+  }, [saving]);
 
   const onReady = () => setReady(true);
 
@@ -119,6 +122,15 @@ export default function CameraScreen() {
   };
 
   const startRecording = async () => {
+    if (!selectedProjectId) {
+      Alert.alert(
+        'Select a project',
+        'Open the Projects tab and tap a project before recording.'
+      );
+      router.replace('/(tabs)/projects');
+      return;
+    }
+
     if (!ready || !camRef.current) {
       Alert.alert('One sec', 'Camera is still starting. Try again in a moment.');
       return;
@@ -168,22 +180,6 @@ export default function CameraScreen() {
     } catch {}
   };
 
-  // 🔴 IMPORTANT: this check must come *after* all hooks above,
-  // so the hook order is always the same on every render.
-  if (!selectedProjectId) {
-    return (
-      <SafeAreaView style={s.center} edges={['top', 'bottom', 'left', 'right']}>
-        <Text style={{ textAlign: 'center', marginBottom: 12 }}>
-          Open the Projects tab and select a project before recording.
-        </Text>
-        <Button
-          title="Go to Projects"
-          onPress={() => router.replace('/(tabs)/projects')}
-        />
-      </SafeAreaView>
-    );
-  }
-
   if (!camPerm || !micPerm) {
     return (
       <View style={s.center}>
@@ -209,19 +205,33 @@ export default function CameraScreen() {
     );
   }
 
+  const noProject = !selectedProjectId;
+
   return (
     <SafeAreaView style={s.full}>
       <View style={s.previewWrap}>
-        <CameraView
-          ref={camRef}
-          style={s.preview}
-          facing="back"
-          mode="video"
-          videoQuality="720p"
-          ratio="16:9"
-          zoom={zoom}
-          onCameraReady={onReady}
-        />
+        {noProject ? (
+          <View style={s.center}>
+            <Text style={{ textAlign: 'center', marginBottom: 12 }}>
+              Open the Projects tab and select a project before recording.
+            </Text>
+            <Button
+              title="Go to Projects"
+              onPress={() => router.replace('/(tabs)/projects')}
+            />
+          </View>
+        ) : (
+          <CameraView
+            ref={camRef}
+            style={s.preview}
+            facing="back"
+            mode="video"
+            videoQuality="720p"
+            ratio="16:9"
+            zoom={zoom}
+            onCameraReady={onReady}
+          />
+        )}
       </View>
 
       {recording && (
@@ -240,37 +250,40 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {/* Zoom controls */}
-      <View style={s.zoomWrap}>
-        <TouchableOpacity
-          onPress={() => setZoom((z) => Math.max(0, z - 0.1))}
-          style={s.zoomBtn}
-        >
-          <Text style={s.zoomText}>–</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => setZoom((z) => Math.min(1, z + 0.1))}
-          style={s.zoomBtn}
-        >
-          <Text style={s.zoomText}>+</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={[s.controls, { marginBottom: insets.bottom + 20 }]}>
-        {!recording ? (
+      {!noProject && (
+        <View style={s.zoomWrap}>
           <TouchableOpacity
-            onPress={startRecording}
-            style={[s.btn, { backgroundColor: ready ? 'red' : '#444' }]}
-            disabled={!ready}
-          />
-        ) : (
+            onPress={() => setZoom((z) => Math.max(0, z - 0.1))}
+            style={s.zoomBtn}
+          >
+            <Text style={s.zoomText}>–</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
-            onPress={stopRecording}
-            style={[s.btn, { backgroundColor: 'white' }]}
-          />
-        )}
-      </View>
+            onPress={() => setZoom((z) => Math.min(1, z + 0.1))}
+            style={s.zoomBtn}
+          >
+            <Text style={s.zoomText}>+</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!noProject && (
+        <View style={[s.controls, { marginBottom: insets.bottom + 20 }]}>
+          {!recording ? (
+            <TouchableOpacity
+              onPress={startRecording}
+              style={[s.btn, { backgroundColor: ready ? 'red' : '#444' }]}
+              disabled={!ready}
+            />
+          ) : (
+            <TouchableOpacity
+              onPress={stopRecording}
+              style={[s.btn, { backgroundColor: 'white' }]}
+            />
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
