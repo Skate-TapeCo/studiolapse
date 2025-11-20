@@ -1,5 +1,6 @@
 // @ts-nocheck
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Asset } from 'expo-asset';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -116,6 +117,15 @@ export default function ExportScreen() {
         />
       </View>
 
+      {/* Placeholder Pro toggle (does nothing yet) */}
+      <View style={s.proRow}>
+        <View style={s.proCheckboxBox} />
+        <View>
+          <Text style={s.proLabel}>Remove watermark</Text>
+          <Text style={s.proHint}>Pro feature (coming soon)</Text>
+        </View>
+      </View>
+
       <Pressable
         style={[s.charcoalBtn, (exporting || status !== 'idle') && { opacity: 0.6 }]}
         disabled={exporting || status !== 'idle'}
@@ -151,7 +161,21 @@ export default function ExportScreen() {
             };
 
             const outPath = `${FileSystem.cacheDirectory}studiolapse_out_${Date.now()}.mp4`;
-            const filter = `[0:v]setpts=PTS/${factor},scale=-2:720,fps=30[v]`;
+
+            // Load watermark asset and ensure we have a real local file path
+            const wmAsset = Asset.fromModule(require('../assets/watermark.png'));
+            await wmAsset.downloadAsync();
+            const wmLocal = wmAsset.localUri;
+            if (!wmLocal) {
+              throw new Error('Watermark file not available on device');
+            }
+            const wmPath = wmLocal.replace(/^file:\/\//, '');
+
+            // Filter: speed + scale main video, then overlay watermark
+            const filter =
+              `[0:v]setpts=PTS/${factor},scale=-2:720,fps=30[base];` +
+              `[1:v]scale=iw/3:-1[wm];` +
+              `[base][wm]overlay=x=main_w-overlay_w-24:y=main_h-overlay_h-24[v]`;
 
             const cmd = [
               '-hide_banner',
@@ -159,6 +183,7 @@ export default function ExportScreen() {
               '-f', 'concat',
               '-safe', '0',
               '-i', listPath,
+              '-i', wmPath,
               '-an',
               '-filter_complex', filter,
               '-map', '[v]',
@@ -196,7 +221,7 @@ export default function ExportScreen() {
                     } else {
                       await MediaLibrary.createAlbumAsync('StudioLapse', asset, false);
                     }
-                    Alert.alert('Exported', `Saved. Speed ≈ ${factor.toFixed(2)}x`);
+                    Alert.alert('Exported', `Saved with watermark. Speed ≈ ${factor.toFixed(2)}x`);
                   } else {
                     Alert.alert('FFmpeg error', logs.slice(0, 1200));
                   }
@@ -204,8 +229,10 @@ export default function ExportScreen() {
                 undefined,
                 (statistics) => {
                   const tMs = statistics.getTime?.();
-                  if (!tMs || !isFinite(tMs) || !totalSec) return;
-                  const pct = Math.max(0, Math.min(100, (tMs / 1000 / totalSec) * 100));
+                  if (!tMs || !isFinite(tMs)) return;
+
+                  const currentSec = tMs / 1000;
+                  const pct = Math.max(0, Math.min(100, (currentSec / target) * 100));
                   setExportProgress(pct);
                 }
               );
@@ -285,6 +312,30 @@ const s = StyleSheet.create({
   clipRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   clipIdx: { width: 22, textAlign: 'right', color: '#555' },
   clipUri: { flex: 1, color: '#333' },
+
+  proRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  proCheckboxBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#eee',
+  },
+  proLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BRAND_CHARCOAL,
+  },
+  proHint: {
+    fontSize: 12,
+    color: '#888',
+  },
 
   charcoalBtn: {
     backgroundColor: BRAND_CHARCOAL,
