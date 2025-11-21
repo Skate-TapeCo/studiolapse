@@ -150,6 +150,7 @@ export default function ExportScreen() {
             for (const u of job.clipUris) {
               totalSec += await getClipDurationSec(u);
             }
+
             const target = Math.max(1, Number(job.targetDurationSec || 1));
             let factor = totalSec > 0 ? totalSec / target : 1;
             if (factor < 1) factor = 1;
@@ -162,16 +163,26 @@ export default function ExportScreen() {
 
             const outPath = `${FileSystem.cacheDirectory}studiolapse_out_${Date.now()}.mp4`;
 
-            // Load watermark asset and ensure we have a real local file path
+            // --- WATERMARK PNG SETUP ---
+            // 1) Load bundled PNG
             const wmAsset = Asset.fromModule(require('../assets/watermark.png'));
             await wmAsset.downloadAsync();
-            const wmLocal = wmAsset.localUri;
-            if (!wmLocal) {
+
+            if (!wmAsset.localUri) {
               throw new Error('Watermark file not available on device');
             }
-            const wmPath = wmLocal.replace(/^file:\/\//, '');
 
-            // Filter: speed + scale main video, then overlay watermark
+            // 2) Copy to a real file path FFmpeg can read
+            const watermarkRealPath = `${FileSystem.documentDirectory}watermark.png`;
+            await FileSystem.copyAsync({
+              from: wmAsset.localUri,
+              to: watermarkRealPath,
+            });
+
+            const wmPath = watermarkRealPath.replace(/^file:\/\//, '');
+            // --- END WATERMARK SETUP ---
+
+            // Filter: speed + scale base video, then overlay PNG watermark bottom-right
             const filter =
               `[0:v]setpts=PTS/${factor},scale=-2:720,fps=30[base];` +
               `[1:v]scale=iw/3:-1[wm];` +
