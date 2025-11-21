@@ -185,8 +185,8 @@ export default function ExportScreen() {
             // Filter: speed + scale base video, then overlay PNG watermark bottom-right
             const filter =
               `[0:v]setpts=PTS/${factor},scale=-2:720,fps=30[base];` +
-              `[1:v]scale=iw/3:-1[wm];` +
-              `[base][wm]overlay=x=main_w-overlay_w-24:y=main_h-overlay_h-24[v]`;
+              `[1:v]format=rgba,colorchannelmixer=aa=0.8,scale=480:-1[wm];` +
+              `[base][wm]overlay=x=main_w-overlay_w-16:y=main_h-overlay_h-12[v]`;
 
             const cmd = [
               '-hide_banner',
