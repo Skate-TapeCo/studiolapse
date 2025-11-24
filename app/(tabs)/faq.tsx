@@ -25,7 +25,9 @@ export default function FAQScreen() {
         <Text style={s.a}>
           Create a project on the Projects tab, give it a name, and select it. Any clips
           you record while that project is selected will be saved to that project. You can
-          view and delete clips from the project screen.
+          view and delete clips from the project screen. Clips are also stored locally in
+          the StudioLapse folder on your phone that is created automatically when you record
+          your first clip.
         </Text>
       </View>
 
@@ -39,6 +41,16 @@ export default function FAQScreen() {
           tier so long timelapses can render significantly faster.
         </Text>
       </View>
+
+      <View style={s.block}>
+        <Text style={s.q}>Where is my timelapsed video?</Text>
+        <Text style={s.a}>
+          Your final timelapsed project is exported locally and will be in the StudioLapse
+          folder that was automatically created on your phone when you recorded your first
+          clip. 
+        </Text>
+      </View>
+
 
       <View style={s.block}>
         <Text style={s.q}>What is the watermark?</Text>
