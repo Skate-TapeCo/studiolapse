@@ -1,13 +1,15 @@
 // @ts-nocheck
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useProject } from '../../src/context/ProjectContext';
 
 const BRAND_ORANGE = '#FF3A1E';
 const BRAND_CHARCOAL = '#2A2F33';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { selectedProjectId } = useProject();
 
   return (
     <View style={s.container}>
@@ -17,7 +19,20 @@ export default function HomeScreen() {
       </Text>
 
       <Pressable
-        onPress={() => router.push('/camera')}
+        onPress={() => {
+          if (!selectedProjectId) {
+            Alert.alert(
+              'No Project Selected',
+              'Please create or select a project before recording.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Go to Projects', onPress: () => router.push('/(tabs)/projects') }
+              ]
+            );
+            return;
+          }
+          router.push('/camera');
+        }}
         style={s.recordBtn}
       >
         <Text style={s.recordText}>Record Session</Text>
