@@ -42,7 +42,7 @@ export default function TabLayout() {
         options={{
           title: 'FAQ',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="questionmark" color={color} />
+            <IconSymbol size={28} name="questionmark.circle" color={color} />
           ),
         }}
       />

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 const SELECTED_PROJECT_KEY = 'studiolapse:selectedProjectId';
+const PROJECTS_KEY = 'studiolapse:projects';
 
 const ProjectContext = createContext({
   selectedProjectId: null,
@@ -12,13 +13,39 @@ const ProjectContext = createContext({
 export function ProjectProvider({ children }) {
   const [selectedProjectId, setSelectedProjectIdState] = useState(null);
 
+  // Load saved selected project, but only if it still exists
   useEffect(() => {
     (async () => {
       try {
         const saved = await AsyncStorage.getItem(SELECTED_PROJECT_KEY);
-        if (saved) setSelectedProjectIdState(saved);
+        if (!saved) {
+          setSelectedProjectIdState(null);
+          return;
+        }
+
+        const rawProjects = await AsyncStorage.getItem(PROJECTS_KEY);
+        if (!rawProjects) {
+          // no projects at all, kill stale selection
+          await AsyncStorage.removeItem(SELECTED_PROJECT_KEY);
+          setSelectedProjectIdState(null);
+          return;
+        }
+
+        const projects = JSON.parse(rawProjects);
+        const exists =
+          Array.isArray(projects) &&
+          projects.some((p) => p && p.id === saved);
+
+        if (exists) {
+          setSelectedProjectIdState(saved);
+        } else {
+          // selected project was deleted
+          await AsyncStorage.removeItem(SELECTED_PROJECT_KEY);
+          setSelectedProjectIdState(null);
+        }
       } catch (e) {
         console.warn('Failed to load selected project:', e);
+        setSelectedProjectIdState(null);
       }
     })();
   }, []);
@@ -41,7 +68,9 @@ export function ProjectProvider({ children }) {
   }, [setSelectedProjectId]);
 
   return (
-    <ProjectContext.Provider value={{ selectedProjectId, setSelectedProjectId, clearSelectedProject }}>
+    <ProjectContext.Provider
+      value={{ selectedProjectId, setSelectedProjectId, clearSelectedProject }}
+    >
       {children}
     </ProjectContext.Provider>
   );
