@@ -258,9 +258,22 @@ export default function ProjectDetail() {
             </Pressable>
 
             <Pressable
-              onPress={async () => {
-                await deleteClip(project.id, index);
-                await loadProject();
+              onPress={() => {
+                Alert.alert(
+                  'Delete Clip',
+                  'Delete this clip? This can’t be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        await deleteClip(project.id, index);
+                        await loadProject();
+                      },
+                    },
+                  ]
+                );
               }}
               style={s.deleteBtn}
             >
