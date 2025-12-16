@@ -41,7 +41,8 @@
           "recordAudioAndroid": true
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withFfmpegKit16kb"
     ],
     "experiments": {
       "typedRoutes": true,
