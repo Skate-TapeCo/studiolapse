@@ -2,8 +2,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView, TouchableOpacity } from 'react-native-gesture-handler';
 import { useProject } from '../../src/context/ProjectContext';
 
 const KEY = 'studiolapse:projects';
@@ -29,15 +30,9 @@ export default function Projects() {
     setProjects(Array.isArray(list) ? list : []);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const add = async () => {
     const p: Project = {
@@ -69,52 +64,69 @@ export default function Projects() {
           isActive ? { opacity: 0.9 } : null,
         ]}
       >
-        <Pressable onLongPress={drag} delayLongPress={120} style={s.dragHandle}>
+        <TouchableOpacity
+          onLongPress={drag}
+          delayLongPress={150}
+          disabled={isActive}
+          style={s.dragHandle}
+        >
           <Text style={s.dragText}>≡</Text>
-        </Pressable>
+        </TouchableOpacity>
 
-        <Pressable style={{ flex: 1 }} onPress={() => setSelectedProjectId(item.id)}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={{ flex: 1 }}
+          disabled={isActive}
+          onPress={() => setSelectedProjectId(item.id)}
+        >
           <Text style={s.name}>{item.name}</Text>
           <Text style={s.meta}>{new Date(item.createdAt).toLocaleString()}</Text>
           {isSelected ? <Text style={s.selectedTag}>Selected</Text> : null}
-        </Pressable>
+        </TouchableOpacity>
 
-        <Pressable onPress={() => openProject(item.id)} style={s.openBtn}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          disabled={isActive}
+          onPress={() => openProject(item.id)}
+          style={s.openBtn}
+        >
           <Text style={s.openBtnText}>Open</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
     );
   };
 
   return (
-    <View style={[s.container, { paddingTop: 16 + (StatusBar.currentHeight || 0) }]}>
-      <Text style={s.title}>Projects</Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={[s.container, { paddingTop: 16 + (StatusBar.currentHeight || 0) }]}>
+        <Text style={s.title}>Projects</Text>
 
-      <View style={s.addRow}>
-        <TextInput
-          placeholder="New project name"
-          value={name}
-          onChangeText={setName}
-          style={s.input}
+        <View style={s.addRow}>
+          <TextInput
+            placeholder="New project name"
+            value={name}
+            onChangeText={setName}
+            style={s.input}
+          />
+          <TouchableOpacity activeOpacity={0.8} onPress={add} style={s.addBtn}>
+            <Text style={s.addBtnText}>Add Project</Text>
+          </TouchableOpacity>
+        </View>
+
+        <DraggableFlatList
+          data={projects}
+          keyExtractor={(p) => p.id}
+          renderItem={renderItem}
+          activationDistance={12}
+          ItemSeparatorComponent={() => <View style={s.sep} />}
+          ListEmptyComponent={<Text style={s.empty}>No projects yet.</Text>}
+          onDragEnd={async ({ data }) => {
+            setProjects(data);
+            await AsyncStorage.setItem(KEY, JSON.stringify(data));
+          }}
         />
-        <Pressable onPress={add} style={s.addBtn}>
-          <Text style={s.addBtnText}>Add Project</Text>
-        </Pressable>
       </View>
-
-      <DraggableFlatList
-        data={projects}
-        keyExtractor={(p) => p.id}
-        renderItem={renderItem}
-        contentContainerStyle={projects.length === 0 ? { flex: 1 } : undefined}
-        ItemSeparatorComponent={() => <View style={s.sep} />}
-        ListEmptyComponent={<Text style={s.empty}>No projects yet.</Text>}
-        onDragEnd={async ({ data }) => {
-          setProjects(data);
-          await AsyncStorage.setItem(KEY, JSON.stringify(data));
-        }}
-      />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
