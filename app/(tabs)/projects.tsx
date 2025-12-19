@@ -2,7 +2,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { useProject } from '../../src/context/ProjectContext';
 
 const KEY = 'studiolapse:projects';
@@ -25,14 +26,17 @@ export default function Projects() {
   const load = useCallback(async () => {
     const raw = await AsyncStorage.getItem(KEY);
     const list: Project[] = raw ? JSON.parse(raw) : [];
-    const sorted = [...list].sort((a, b) => b.createdAt - a.createdAt);
-    setProjects(sorted);
+    setProjects(Array.isArray(list) ? list : []);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useFocusEffect(
-    useCallback(() => { load(); }, [load])
+    useCallback(() => {
+      load();
+    }, [load])
   );
 
   const add = async () => {
@@ -43,17 +47,18 @@ export default function Projects() {
       clips: [],
     };
     const next = [p, ...projects];
-    await AsyncStorage.setItem(KEY, JSON.stringify(next));
     setProjects(next);
     setName('');
+    await AsyncStorage.setItem(KEY, JSON.stringify(next));
   };
 
   const openProject = (id: string) => {
     router.push(`/project/${id}`);
   };
 
-  const renderItem = ({ item }: { item: Project }) => {
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<Project>) => {
     const isSelected = selectedProjectId === item.id;
+
     return (
       <View
         style={[
@@ -61,13 +66,19 @@ export default function Projects() {
           isSelected
             ? { borderColor: BRAND_ORANGE, backgroundColor: '#FFE9E5' }
             : { borderColor: '#eee', backgroundColor: '#fff' },
+          isActive ? { opacity: 0.9 } : null,
         ]}
       >
+        <Pressable onLongPress={drag} delayLongPress={120} style={s.dragHandle}>
+          <Text style={s.dragText}>≡</Text>
+        </Pressable>
+
         <Pressable style={{ flex: 1 }} onPress={() => setSelectedProjectId(item.id)}>
           <Text style={s.name}>{item.name}</Text>
           <Text style={s.meta}>{new Date(item.createdAt).toLocaleString()}</Text>
           {isSelected ? <Text style={s.selectedTag}>Selected</Text> : null}
         </Pressable>
+
         <Pressable onPress={() => openProject(item.id)} style={s.openBtn}>
           <Text style={s.openBtnText}>Open</Text>
         </Pressable>
@@ -91,12 +102,17 @@ export default function Projects() {
         </Pressable>
       </View>
 
-      <FlatList
+      <DraggableFlatList
         data={projects}
         keyExtractor={(p) => p.id}
         renderItem={renderItem}
+        contentContainerStyle={projects.length === 0 ? { flex: 1 } : undefined}
         ItemSeparatorComponent={() => <View style={s.sep} />}
         ListEmptyComponent={<Text style={s.empty}>No projects yet.</Text>}
+        onDragEnd={async ({ data }) => {
+          setProjects(data);
+          await AsyncStorage.setItem(KEY, JSON.stringify(data));
+        }}
       />
     </View>
   );
@@ -118,6 +134,18 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+
+  dragHandle: {
+    width: 34,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: '#f2f2f2',
+  },
+  dragText: { fontSize: 20, fontWeight: '900', color: '#666', marginTop: -2 },
+
   name: { fontSize: 16, fontWeight: '700', color: BRAND_CHARCOAL },
   meta: { color: '#666', marginTop: 2 },
   selectedTag: { marginTop: 4, fontSize: 12, fontWeight: '800', color: BRAND_ORANGE },
