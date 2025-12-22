@@ -30,9 +30,15 @@ export default function Projects() {
     setProjects(Array.isArray(list) ? list : []);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const add = async () => {
     const p: Project = {
@@ -75,12 +81,16 @@ export default function Projects() {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          style={{ flex: 1 }}
           disabled={isActive}
           onPress={() => setSelectedProjectId(item.id)}
+          style={s.leftCol}
         >
-          <Text style={s.name}>{item.name}</Text>
-          <Text style={s.meta}>{new Date(item.createdAt).toLocaleString()}</Text>
+          <Text style={s.name} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={s.meta} numberOfLines={1}>
+            {new Date(item.createdAt).toLocaleString()}
+          </Text>
           {isSelected ? <Text style={s.selectedTag}>Selected</Text> : null}
         </TouchableOpacity>
 
@@ -145,6 +155,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
 
   dragHandle: {
@@ -158,11 +169,23 @@ const s = StyleSheet.create({
   },
   dragText: { fontSize: 20, fontWeight: '900', color: '#666', marginTop: -2 },
 
+  leftCol: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 10,
+  },
+
   name: { fontSize: 16, fontWeight: '700', color: BRAND_CHARCOAL },
   meta: { color: '#666', marginTop: 2 },
   selectedTag: { marginTop: 4, fontSize: 12, fontWeight: '800', color: BRAND_ORANGE },
 
-  openBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: BRAND_CHARCOAL, borderRadius: 10, marginLeft: 10 },
+  openBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: BRAND_CHARCOAL,
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
   openBtnText: { color: '#fff', fontWeight: '800' },
 
   sep: { height: 10 },

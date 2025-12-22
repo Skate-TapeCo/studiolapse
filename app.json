@@ -6,7 +6,6 @@
     "orientation": "default",
     "android": {
       "package": "com.studiolapse.studiolapse",
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
