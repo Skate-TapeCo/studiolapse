@@ -154,7 +154,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
 
