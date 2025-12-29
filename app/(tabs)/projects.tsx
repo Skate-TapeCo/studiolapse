@@ -41,12 +41,15 @@ export default function Projects() {
   );
 
   const add = async () => {
+    const trimmed = (name || '').trim().slice(0, 25);
+
     const p: Project = {
       id: Date.now().toString(),
-      name: (name || '').trim() || 'Untitled',
+      name: trimmed || 'Untitled',
       createdAt: Date.now(),
       clips: [],
     };
+
     const next = [p, ...projects];
     setProjects(next);
     setName('');
@@ -85,12 +88,14 @@ export default function Projects() {
           onPress={() => setSelectedProjectId(item.id)}
           style={s.leftCol}
         >
-          <Text style={s.name} numberOfLines={1}>
-            {item.name}
+          <Text style={s.name} numberOfLines={1} ellipsizeMode="tail">
+            {(item.name || '').slice(0, 25)}
           </Text>
+
           <Text style={s.meta} numberOfLines={1}>
             {new Date(item.createdAt).toLocaleString()}
           </Text>
+
           {isSelected ? <Text style={s.selectedTag}>Selected</Text> : null}
         </TouchableOpacity>
 
@@ -117,6 +122,7 @@ export default function Projects() {
             value={name}
             onChangeText={setName}
             style={s.input}
+            maxLength={25}
           />
           <TouchableOpacity activeOpacity={0.8} onPress={add} style={s.addBtn}>
             <Text style={s.addBtnText}>Add Project</Text>
@@ -144,7 +150,14 @@ const s = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16, backgroundColor: '#fff' },
   title: { fontSize: 24, fontWeight: '900', color: BRAND_CHARCOAL, marginBottom: 12 },
   addRow: { flexDirection: 'row', gap: 8, marginBottom: 12, alignItems: 'center' },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 10, paddingHorizontal: 10, height: 40 },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 40,
+  },
   addBtn: { backgroundColor: BRAND_ORANGE, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   addBtnText: { color: '#fff', fontWeight: '800' },
 
