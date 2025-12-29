@@ -9,8 +9,7 @@
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
-        "FOREGROUND_SERVICE_CAMERA",
-        "READ_MEDIA_VIDEO"
+        "FOREGROUND_SERVICE_CAMERA"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#2A2F33"
