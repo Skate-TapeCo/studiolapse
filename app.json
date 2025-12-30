@@ -11,6 +11,12 @@
         "RECORD_AUDIO",
         "FOREGROUND_SERVICE_CAMERA"
       ],
+      "blockedPermissions": [
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#2A2F33"
       }
